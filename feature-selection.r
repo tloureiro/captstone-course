@@ -1,14 +1,9 @@
-options(java.parameters = "-Xmx24g")
+options(java.parameters = "-Xmx28g")
 
 library(feather)
 library(FSelector)
 library(dplyr)
-
-subsample = function(df) {
-  #df = df[df$itp < 4 | (df$itp > 45 & df$itp < 50) | df$itp > 107,]
-  df = df[df$itp == 3 | df$itp == 47 | df$itp == 108,]
-  return(df)
-}
+library(caret)
 
 testCFS = function(df) {
   cat('Most important variables are displayed first:', '\n')
@@ -31,53 +26,31 @@ testCFS = function(df) {
     cat('Done', '\n')
 }
 
-balanceDatasetByDV = function(df, lower_limit_fraction) {
-  
-  lower_limit = min(
-    nrow(df[df$radius0_bin == '0-25',]), 
-    nrow(df[df$radius0_bin == '25-50',]), 
-    nrow(df[df$radius0_bin == '50-75',]), 
-    nrow(df[df$radius0_bin == '75-100',])
-  )
-  
-  df = rbind(
-    sample_n(df[df$radius0_bin == '0-25',], lower_limit/lower_limit_fraction), 
-    sample_n(df[df$radius0_bin == '25-50',], lower_limit/lower_limit_fraction), 
-    sample_n(df[df$radius0_bin == '50-75',], lower_limit/lower_limit_fraction), 
-    sample_n(df[df$radius0_bin == '75-100',], lower_limit/lower_limit_fraction)
-  )
-  
-  return(df)
-}
-
 set.seed(2019)
+
+f = radius0_bin ~ pressure + temperature + salinity + month + freezing_point_delta + season
 
 df = read_feather('/home/tloureiro/projects/arctic-analysis/data/produced-csvs/clean_final.feather')
 
-df_balanced = balanceDatasetByDV(df, 1)
-df_subsampled = subsample(df)
-
-remove(df)
+#subsample keeping the proportions (limited memory to run cfs)
+indices = createDataPartition(df$radius0_bin, p=0.7, list = FALSE)
+df = df[indices,]
 
 #CFS
 cat('Running CFS against the subsampled dataset', '\n')
-testCFS(df_subsampled)
-
-cat('Running CFS against balanced dataset', '\n')
-testCFS(df_balanced)
+testCFS(df)
 
 #Information Gain
 cat('Running Information Gain against the subsampled dataset', '\n')
-information.gain(radius0_bin ~ pressure + temperature + salinity + month + freezing_point_delta + season, df_subsampled)
-
-cat('Running Information Gain against the balanced dataset', '\n')
-information.gain(radius0_bin ~ pressure + temperature + salinity + month + freezing_point_delta + season, df_balanced)
+information.gain(f, df)
 
 #Chi Square
 cat('Running Chi Squared against the subsampled dataset', '\n')
-chi.squared(radius0_bin ~ pressure + temperature + salinity + month + freezing_point_delta + season, df_subsampled)
+chi.squared(f, df)
 
-cat('Running Chi Squared against the balanced dataset', '\n')
-chi.squared(radius0_bin ~ pressure + temperature + salinity + month + freezing_point_delta + season, df_balanced)
 
+#comparison
+barplot(c(3, 3, 2, 2, 2, 1), names.arg = c('month', 'season', 'fpd', 'temperature', 'salinity', 'pressure'), main = 'CFS (by reverse order)')
+barplot(c(0.14, 0.09, 0.02, 0.01, 0.01, 0), names.arg = c('month', 'season', 'fpd', 'temperature', 'salinity', 'pressure'), main = 'Information Gain')
+barplot(c(0.31, 0.22, 0.13, 0.12, 0.11, 0.01), names.arg = c('month', 'season', 'fpd', 'temperature', 'salinity', 'pressure'), main = 'Chi-squared')
 

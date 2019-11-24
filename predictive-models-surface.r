@@ -29,14 +29,13 @@ balanceDatasetByDV = function(df, lower_limit_fraction) {
 }
 
 set.seed(2019)
-control = trainControl(method="cv", number=3)
+control = trainControl(method="cv", number=10)
 
 df = read_feather('/home/tloureiro/projects/arctic-analysis/data/produced-csvs/clean_final.feather')
 
-indices = createDataPartition(df$radius0_bin, p=0.25, list = FALSE)
-df = df[indices,]
+df = df[df$pressure <= 10, ]
 
-indices = createDataPartition(df$radius0_bin, p=0.5, list = FALSE)
+indices = createDataPartition(df$radius0_bin, p=0.7, list = FALSE)
 df_train = df[indices,]
 df_test = df[-indices,]
 
@@ -44,7 +43,7 @@ remove(df)
 
 df_balanced_train = balanceDatasetByDV(df_train, 1)
 
-f = radius0_bin ~ pressure + temperature + salinity + month + freezing_point_delta + season
+f = radius0_bin ~ temperature + salinity + month + freezing_point_delta + season
 
 #multinom
 cat('Multinomial Log-linear\n')
